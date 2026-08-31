@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnom Mailbox Robot Controller - Cut The Rope Room</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for Playful Theme -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- TensorFlow & Teachable Machine Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        fredoka: ['Fredoka', 'sans-serif'],
+                    },
+                    colors: {
+                        omnomGreen: '#7cb342',
+                        candyRed: '#ff5252',
+                        candyYellow: '#ffca28',
+                        boxBrown: '#8d6e63',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Fredoka', cursive, sans-serif;
+            /* Background Garis-Garis Biru-Putih khas Kamar Om Nom */
+            background: repeating-linear-gradient(
+                90deg,
+                #bce0fd,
+                #bce0fd 40px,
+                #ffffff 40px,
+                #ffffff 80px
+            );
+            background-attachment: fixed;
+        }
+
+        /* Styling & Animasi Stiker 3D */
+        .sticker {
+            filter: drop-shadow(0px 6px 4px rgba(0, 0, 0, 0.2));
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            user-select: none;
+        }
+        .sticker:hover {
+            transform: scale(1.15) rotate(6deg);
+            cursor: pointer;
+        }
+
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px) rotate(-3deg); }
+            50% { transform: translateY(-8px) rotate(3deg); }
+        }
+        .animate-float {
+            animation: floatSlow 3s ease-in-out infinite;
+        }
+
+        /* 3D Toy Buttons */
+        .btn-toy-light {
+            box-shadow: 0px 6px 0px #558b2f;
+            transition: all 0.1s ease;
+        }
+        .btn-toy-light:active {
+            transform: translateY(4px);
+            box-shadow: 0px 2px 0px #558b2f;
+        }
+
+        .btn-candy-light {
+            box-shadow: 0px 6px 0px #c62828;
+            transition: all 0.1s ease;
+        }
+        .btn-candy-light:active {
+            transform: translateY(4px);
+            box-shadow: 0px 2px 0px #c62828;
+        }
+
+        /* Active D-Pad Button */
+        .active-btn {
+            background-color: #ffca28 !important;
+            color: #2e7d32 !important;
+            border-color: #7cb342 !important;
+            box-shadow: 0 0 25px #ffca28 !important;
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="min-h-screen p-3 lg:p-6 flex flex-col justify-between selection:bg-omnomGreen selection:text-white relative overflow-x-hidden">
+
+    <!-- DEKORASI BINGKAI FOTO DI WALLPAPER -->
+    <!-- Bingkai 1: Bintang (Tengah Atas) -->
+    <div class="fixed top-12 left-1/2 transform -translate-x-1/2 z-0 hidden md:flex items-center justify-center w-28 h-16 bg-purple-700 border-4 border-amber-800 rounded-lg shadow-lg rotate-2">
+        <span class="text-amber-300 text-xl">⭐ ⭐ ⭐</span>
+    </div>
+
+    <!-- Bingkai 2: Pemandangan Green (Kiri) -->
+    <div class="fixed top-36 left-12 z-0 hidden lg:flex items-center justify-center w-20 h-16 bg-emerald-300 border-4 border-slate-500 rounded-lg shadow-lg -rotate-6">
+        <span class="text-emerald-700 text-2xl">⛰️</span>
+    </div>
+
+    <!-- Bingkai 3: Mahkota (Kanan) -->
+    <div class="fixed top-40 right-16 z-0 hidden lg:flex items-center justify-center w-24 h-32 bg-amber-400 border-4 border-rose-700 rounded-lg shadow-lg rotate-3">
+        <span class="text-rose-700 text-4xl">👑</span>
+    </div>
+
+    <!-- STIKER OM NOM MENGINTIP DI POJOK KIRI BAWAH -->
+    <div class="fixed bottom-2 left-4 z-40 sticker animate-float hidden sm:block">
+        <div class="bg-omnomGreen border-4 border-white rounded-t-full p-4 pb-0 w-28 h-20 shadow-2xl flex flex-col items-center">
+            <div class="flex gap-2 -mt-1">
+                <div class="w-6 h-6 bg-white rounded-full flex items-center justify-center border border-gray-200 shadow-sm">
+                    <div class="w-3 h-3 bg-black rounded-full"></div>
+                </div>
+                <div class="w-6 h-6 bg-white rounded-full flex items-center justify-center border border-gray-200 shadow-sm">
+                    <div class="w-3 h-3 bg-black rounded-full"></div>
+                </div>
+            </div>
+            <div class="w-10 h-3 bg-green-950 rounded-t-full mt-1 flex justify-around">
+                <div class="w-2 h-2 bg-white clip-path-triangle"></div>
+                <div class="w-2 h-2 bg-white clip-path-triangle"></div>
+            </div>
+        </div>
+        <span class="bg-candyYellow text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full border-2 border-white shadow-md -mt-2 inline-block ml-3">
+            Nyam! 🍬
+        </span>
+    </div>
+
+    <div class="w-full max-w-[1400px] mx-auto space-y-5 z-10 relative">
+        
+        <!-- HEADER UI -->
+        <header class="w-full bg-white/95 backdrop-blur-md rounded-[35px] p-5 border-4 border-omnomGreen/40 shadow-xl flex flex-col md:flex-row justify-between items-center gap-4 relative">
+            
+            <div class="absolute -top-4 left-8 sticker z-20">
+                <span class="bg-candyRed text-white text-xs font-black px-4 py-1.5 rounded-full border-2 border-white shadow-md transform -rotate-6 inline-block">
+                    🎀 OM NOM ROOM CONTROLLER
+                </span>
+            </div>
+
+            <div class="flex items-center gap-4 z-10 pt-2 md:pt-0">
+                <!-- Stiker Avatar Om Nom -->
+                <div class="sticker relative w-16 h-16 rounded-3xl bg-omnomGreen border-4 border-white flex flex-col items-center justify-center shadow-md transform -rotate-3">
+                    <div class="flex gap-1 -mt-1">
+                        <div class="w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                            <div class="w-2.5 h-2.5 bg-black rounded-full"></div>
+                        </div>
+                        <div class="w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                            <div class="w-2.5 h-2.5 bg-black rounded-full"></div>
+                        </div>
+                    </div>
+                    <div class="w-8 h-3 bg-green-950 rounded-b-full flex justify-around items-start px-1 mt-0.5">
+                        <div class="w-1.5 h-1.5 bg-white rounded-b-full"></div>
+                        <div class="w-1.5 h-1.5 bg-white rounded-b-full"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black tracking-wide text-omnomGreen">
+                        Omnom Mailbox Robot Controller
+                    </h1>
+                    <p class="text-emerald-700 text-xs font-bold">Kendalikan robot Om Nom di dalam kamarnya!</p>
+                </div>
+            </div>
+            
+            <!-- Controls Status & Connection -->
+            <div class="flex items-center gap-3 w-full md:w-auto justify-end flex-wrap z-10">
+                <div id="mode-badge" class="px-4 py-2 rounded-full bg-amber-100 border-2 border-candyYellow text-xs font-black text-amber-900 tracking-wider shadow-sm">
+                    🕹️ Mode: Tombol Stik
+                </div>
+
+                <!-- Firebase Modal Trigger Button -->
+                <button onclick="toggleModal(true)" class="btn-candy-light p-3 bg-candyRed hover:bg-red-500 text-white font-bold rounded-2xl border-2 border-white transition" title="Kunci Firebase">
+                    <i class="fas fa-fire text-lg"></i>
+                </button>
+
+                <!-- Bluetooth Connect Button -->
+                <button id="btn-connect" onclick="connectBluetooth()" class="btn-toy-light px-5 py-3 bg-omnomGreen hover:bg-lime-500 text-white rounded-2xl font-black text-xs border-2 border-white flex items-center gap-2">
+                    <i class="fab fa-bluetooth-b text-sm"></i>
+                    <span id="ble-btn-text">Koneksikan Om Nom!</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN CONTROLLER LAYOUT -->
+        <main class="w-full grid grid-cols-1 lg:grid-cols-2 gap-5">
+            
+            <!-- CONTROLLER D-PAD PANEL -->
+            <section class="bg-white/95 backdrop-blur-md rounded-[40px] p-6 border-4 border-omnomGreen/30 shadow-xl flex flex-col items-center justify-between min-h-[480px] relative">
+                
+                <div class="absolute top-4 right-4 sticker text-3xl">🍬</div>
+                <div class="absolute bottom-16 left-4 sticker text-3xl">⭐</div>
+
+                <div class="w-full flex justify-between items-center mb-2 z-10">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">🎮</span>
+                        <h2 class="text-lg font-black text-omnomGreen">Setir Kemudi Om Nom</h2>
+                    </div>
+                    <span class="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-full border border-emerald-300">Tekan Panah</span>
+                </div>
+
+                <!-- D-Pad Container -->
+                <div class="relative w-72 h-72 sm:w-[310px] sm:h-[310px] rounded-full bg-emerald-50 border-8 border-omnomGreen/40 shadow-inner flex items-center justify-center p-4 my-auto z-10">
+                    
+                    <div class="grid grid-cols-3 gap-3 w-full h-full p-2 select-none">
+                        <div></div>
+                        <!-- MAJU -->
+                        <button id="bt-up" class="dpad-btn btn-toy-light group w-full h-full bg-omnomGreen hover:bg-lime-600 rounded-t-full border-4 border-white flex flex-col items-center justify-center text-white">
+                            <i class="fas fa-arrow-up text-2xl group-hover:-translate-y-1 transition-transform"></i>
+                            <span class="text-[10px] font-black uppercase tracking-wider mt-1">MAJU</span>
+                        </button>
+                        <div></div>
+
+                        <!-- KIRI -->
+                        <button id="bt-left" class="dpad-btn btn-toy-light group w-full h-full bg-omnomGreen hover:bg-lime-600 rounded-l-full border-4 border-white flex flex-col items-center justify-center text-white">
+                            <i class="fas fa-arrow-left text-2xl group-hover:-translate-x-1 transition-transform"></i>
+                            <span class="text-[10px] font-black uppercase tracking-wider mt-1">KIRI</span>
+                        </button>
+
+                        <!-- PUSAT STATUS EMOTICON STIKER OM NOM -->
+                        <div class="flex items-center justify-center">
+                            <div class="w-14 h-14 rounded-full bg-white border-4 border-candyYellow flex items-center justify-center shadow-md">
+                                <div id="status-dot" class="w-5 h-5 bg-candyRed rounded-full shadow-md transition-all"></div>
+                            </div>
+                        </div>
+
+                        <!-- KANAN -->
+                        <button id="bt-right" class="dpad-btn btn-toy-light group w-full h-full bg-omnomGreen hover:bg-lime-600 rounded-r-full border-4 border-white flex flex-col items-center justify-center text-white">
+                            <i class="fas fa-arrow-right text-2xl group-hover:translate-x-1 transition-transform"></i>
+                            <span class="text-[10px] font-black uppercase tracking-wider mt-1">KANAN</span>
+                        </button>
+
+                        <div></div>
+                        <!-- MUNDUR -->
+                        <button id="bt-down" class="dpad-btn btn-toy-light group w-full h-full bg-omnomGreen hover:bg-lime-600 rounded-b-full border-4 border-white flex flex-col items-center justify-center text-white">
+                            <span class="text-[10px] font-black uppercase tracking-wider mb-1">MUNDUR</span>
+                            <i class="fas fa-arrow-down text-2xl group-hover:translate-y-1 transition-transform"></i>
+                        </button>
+                        <div></div>
+                    </div>
+                </div>
+
+                <!-- Footer Status Connection -->
+                <div class="w-full flex justify-between items-center text-xs font-bold text-gray-600 border-t-2 border-emerald-100 pt-4 z-10">
+                    <span>Bluetooth: <strong id="ble-status" class="text-candyRed">Terputus ❌</strong></span>
+                    <span>Firebase: <strong id="fb-status" class="text-amber-600">Belum Konek ⚠️</strong></span>
+                </div>
+            </section>
+
+            <!-- CAMERA AI GESTURE PANEL -->
+            <section class="bg-white/95 backdrop-blur-md rounded-[40px] p-6 border-4 border-candyYellow shadow-xl flex flex-col items-center justify-between min-h-[480px] relative">
+                
+                <div class="absolute -top-3 left-6 sticker bg-white px-3 py-1 rounded-full border-2 border-candyYellow text-xs font-black text-amber-900 shadow-md transform -rotate-3">
+                    👀 Mata AI Om Nom!
+                </div>
+                <div class="absolute top-4 right-4 sticker text-3xl">🍭</div>
+
+                <div class="w-full flex justify-between items-center mb-2 pt-4 z-10">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">📷</span>
+                        <h2 class="text-lg font-black text-amber-800">Mata AI Om Nom</h2>
+                    </div>
+                    <!-- Toggle Switch AI -->
+                    <button id="btn-toggle-cam" onclick="toggleCamera()" class="btn-toy-light px-5 py-2.5 bg-candyYellow hover:bg-amber-400 text-amber-950 font-black rounded-2xl text-xs border-2 border-white flex items-center gap-2">
+                        <i class="fas fa-eye"></i>
+                        <span id="cam-btn-text">Nyalakan Kamera</span>
+                    </button>
+                </div>
+
+                <!-- Camera Screen Frame -->
+                <div class="relative w-full max-w-[270px] aspect-square rounded-[35px] overflow-hidden border-4 border-candyYellow shadow-lg bg-amber-50 flex flex-col items-center justify-center my-auto z-10">
+                    <div id="webcam-container" class="w-full h-full flex items-center justify-center"></div>
+                    <div id="cam-placeholder" class="text-amber-800 flex flex-col items-center gap-2">
+                        <i class="fas fa-box-open text-5xl mb-1 text-boxBrown"></i>
+                        <span class="text-xs font-bold">Kamera Masih Tutup...</span>
+                    </div>
+                </div>
+
+                <!-- AI Output Predictions -->
+                <div class="w-full border-t-2 border-amber-100 pt-4 z-10">
+                    <div class="text-xs font-bold text-amber-900 mb-2">Tebakan Gerakan Tangan:</div>
+                    <div id="label-container" class="grid grid-cols-2 gap-2 text-xs font-bold"></div>
+                </div>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Bottom Command Status Banner -->
+    <footer class="w-full max-w-[1400px] mx-auto mt-5 bg-white rounded-3xl p-4 border-4 border-omnomGreen/40 flex justify-between items-center text-sm shadow-lg relative z-10">
+        <span class="text-emerald-800 font-black flex items-center gap-2">
+            <span>📦</span> Perintah Jalan Om Nom:
+        </span>
+        <div class="bg-amber-100 px-6 py-2 rounded-2xl border-2 border-candyYellow text-emerald-800 font-black text-lg uppercase tracking-wider shadow-inner">
+            <span id="last-cmd">STOP</span>
+        </div>
+    </footer>
+
+    <!-- MODAL FIREBASE SETTINGS -->
+    <div id="fb-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white border-4 border-candyYellow rounded-[35px] p-6 w-full max-w-md shadow-2xl space-y-4 relative">
+            <div class="flex justify-between items-center border-b-2 border-amber-100 pb-3">
+                <h3 class="text-lg font-black text-amber-800 flex items-center gap-2">
+                    <i class="fas fa-key text-candyRed"></i> Kunci Firebase Om Nom
+                </h3>
+                <button onclick="toggleModal(false)" class="text-gray-400 hover:text-gray-700 text-xl">
+                    <i class="fas fa-times-circle"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">API Key</label>
+                    <input type="text" id="fb-api-key" placeholder="Masukkan API Key..." class="w-full bg-amber-50 border-2 border-amber-300 rounded-2xl px-4 py-2 text-xs text-gray-800 focus:outline-none focus:border-omnomGreen">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Database URL</label>
+                    <input type="text" id="fb-db-url" placeholder="https://...firebaseio.com" class="w-full bg-amber-50 border-2 border-amber-300 rounded-2xl px-4 py-2 text-xs text-gray-800 focus:outline-none focus:border-omnomGreen">
+                </div>
+            </div>
+
+            <div class="pt-2 flex justify-end gap-2">
+                <button onclick="toggleModal(false)" class="btn-candy-light px-4 py-2 bg-gray-400 text-white font-bold text-xs rounded-xl">
+                    Batal
+                </button>
+                <button onclick="initFirebase()" class="btn-toy-light px-5 py-2 bg-omnomGreen text-white font-black text-xs rounded-xl">
+                    Simpan & Konek!
+                </button>
+            </div>
+        </div>
+    </div>
+
+<script type="text/javascript">
+    function toggleModal(show) {
+        const modal = document.getElementById('fb-modal');
+        if (show) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        } else {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    }
+
+    let dbRef = null;
+
+    function initFirebase() {
+        const apiKey = document.getElementById('fb-api-key').value.trim();
+        const databaseURL = document.getElementById('fb-db-url').value.trim();
+
+        if (!apiKey || !databaseURL) {
+            alert("Isi dulu API Key & Database URL-nya ya! 🍬");
+            return;
+        }
+
+        try {
+            const firebaseConfig = { apiKey, databaseURL };
+
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            } else {
+                firebase.app().delete().then(() => {
+                    firebase.initializeApp(firebaseConfig);
+                });
+            }
+
+            dbRef = firebase.database().ref('robot_control');
+            document.getElementById('fb-status').innerText = "Terhubung! 🟢";
+            document.getElementById('fb-status').className = "text-emerald-600 font-bold";
+            toggleModal(false);
+            alert("Hore! Firebase Om Nom berhasil tersambung! 🎉");
+        } catch(e) {
+            console.error("Firebase Init Error:", e);
+            document.getElementById('fb-status').innerText = "Gagal Konek ❌";
+            document.getElementById('fb-status').className = "text-candyRed font-bold";
+            alert("Gagal konek Firebase. Cek lagi ya!");
+        }
+    }
+
+    function sendToFirebase(command, mode) {
+        if (dbRef) {
+            dbRef.set({
+                command: command,
+                mode: mode,
+                timestamp: Date.now()
+            }).catch(err => console.error("Firebase Sync Error:", err));
+        }
+    }
+
+    const MODEL_URL = "https://teachablemachine.withgoogle.com/models/mZ_Qhc9ZT/";
+    let model, webcam, labelContainer, maxPredictions;
+    let bluetoothDevice, uartTxCharacteristic;
+    let currentCommand = "stop";
+    let isAiMode = false;
+
+    const UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+    const UART_TX_CHARACTERISTIC_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+
+    async function connectBluetooth() {
+        try {
+            bluetoothDevice = await navigator.bluetooth.requestDevice({
+                filters: [{ namePrefix: 'BBC micro:bit' }],
+                optionalServices: [UART_SERVICE_UUID]
+            });
+
+            const server = await bluetoothDevice.gatt.connect();
+            const service = await server.getPrimaryService(UART_SERVICE_UUID);
+            uartTxCharacteristic = await service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
+
+            document.getElementById('ble-status').innerText = "Terhubung! 🟢";
+            document.getElementById('ble-status').className = "text-emerald-600 font-bold";
+            document.getElementById('ble-btn-text').innerText = "Om Nom Terhubung!";
+            document.getElementById('status-dot').className = "w-5 h-5 bg-omnomGreen rounded-full shadow-md animate-pulse";
+        } catch (error) {
+            console.error("Bluetooth Gagal:", error);
+            alert("Gagal konek Bluetooth ke Om Nom.");
+        }
+    }
+
+    function sendToMicrobit(command) {
+        if (currentCommand === command) return;
+        currentCommand = command;
+        document.getElementById('last-cmd').innerText = command;
+
+        sendToFirebase(command, isAiMode ? "AI_AUTOMATIC" : "MANUAL_JOYSTICK");
+
+        if (uartTxCharacteristic) {
+            const encoder = new TextEncoder();
+            uartTxCharacteristic.writeValue(encoder.encode(command + "\n"))
+                .catch(err => console.error("Bluetooth TX Error:", err));
+        }
+    }
+
+    function setupManualJoystick() {
+        const buttons = {
+            'bt-up': 'up',
+            'bt-down': 'down',
+            'bt-left': 'left',
+            'bt-right': 'right'
+        };
+
+        Object.keys(buttons).forEach(id => {
+            const btn = document.getElementById(id);
+            const cmd = buttons[id];
+
+            const startPress = (e) => {
+                e.preventDefault();
+                if (!isAiMode) {
+                    highlightButton(id);
+                    sendToMicrobit(cmd);
+                }
+            };
+
+            const endPress = (e) => {
+                e.preventDefault();
+                if (!isAiMode) {
+                    resetButtons();
+                    sendToMicrobit("stop");
+                }
+            };
+
+            btn.addEventListener('mousedown', startPress);
+            btn.addEventListener('mouseup', endPress);
+            btn.addEventListener('mouseleave', endPress);
+            btn.addEventListener('touchstart', startPress);
+            btn.addEventListener('touchend', endPress);
+        });
+    }
+    setupManualJoystick();
+
+    async function toggleCamera() {
+        if (!isAiMode) {
+            document.getElementById('cam-btn-text').innerText = "Membuka...";
+            if (!model) {
+                const modelURL = MODEL_URL + "model.json";
+                const metadataURL = MODEL_URL + "metadata.json";
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+            }
+
+            const flip = true;
+            webcam = new tmImage.Webcam(270, 270, flip);
+            await webcam.setup();
+            await webcam.play();
+
+            document.getElementById('cam-placeholder').style.display = "none";
+            document.getElementById('webcam-container').appendChild(webcam.canvas);
+
+            labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "";
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+
+            isAiMode = true;
+            document.getElementById('cam-btn-text').innerText = "Tutup Kamera";
+            document.getElementById('btn-toggle-cam').classList.replace('bg-candyYellow', 'bg-candyRed');
+            document.getElementById('mode-badge').innerText = "👁️ Mode: AI Kamera";
+            document.getElementById('mode-badge').className = "px-4 py-2 rounded-full bg-candyRed text-xs font-black text-white shadow-md animate-pulse";
+
+            window.requestAnimationFrame(loop);
+        } else {
+            isAiMode = false;
+            if (webcam) webcam.stop();
+            document.getElementById('webcam-container').innerHTML = "";
+            document.getElementById('cam-placeholder').style.display = "flex";
+            document.getElementById('label-container').innerHTML = "";
+            
+            document.getElementById('cam-btn-text').innerText = "Nyalakan Kamera";
+            document.getElementById('btn-toggle-cam').classList.replace('bg-candyRed', 'bg-candyYellow');
+            document.getElementById('mode-badge').innerText = "🕹️ Mode: Tombol Stik";
+            document.getElementById('mode-badge').className = "px-4 py-2 rounded-full bg-amber-100 border-2 border-candyYellow text-xs font-black text-amber-900 tracking-wider shadow-sm";
+
+            resetButtons();
+            sendToMicrobit("stop");
+        }
+    }
+
+    async function loop() {
+        if (!isAiMode) return;
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        let highestProb = 0;
+        let bestClass = "stop";
+
+        for (let i = 0; i < maxPredictions; i++) {
+            const className = prediction[i].className;
+            const probability = prediction[i].probability;
+
+            labelContainer.childNodes[i].innerHTML = 
+                `<div class="bg-amber-50 p-2 rounded-2xl border border-amber-200 flex justify-between items-center">
+                    <span class="capitalize text-amber-900 text-[11px]">${className}</span>
+                    <span class="font-black text-omnomGreen text-[11px]">${(probability * 100).toFixed(0)}%</span>
+                 </div>`;
+
+            if (probability > highestProb) {
+                highestProb = probability;
+                bestClass = className.toLowerCase();
+            }
+        }
+
+        if (highestProb < 0.65) bestClass = "stop";
+
+        if (bestClass.includes("atas") || bestClass.includes("up") || bestClass.includes("maju")) {
+            highlightButton('bt-up');
+            sendToMicrobit("up");
+        } else if (bestClass.includes("bawah") || bestClass.includes("down") || bestClass.includes("mundur")) {
+            highlightButton('bt-down');
+            sendToMicrobit("down");
+        } else if (bestClass.includes("kiri") || bestClass.includes("left")) {
+            highlightButton('bt-left');
+            sendToMicrobit("left");
+        } else if (bestClass.includes("kanan") || bestClass.includes("right")) {
+            highlightButton('bt-right');
+            sendToMicrobit("right");
+        } else {
+            resetButtons();
+            sendToMicrobit("stop");
+        }
+    }
+
+    function highlightButton(buttonId) {
+        resetButtons();
+        const btn = document.getElementById(buttonId);
+        if (btn) btn.classList.add('active-btn');
+    }
+
+    function resetButtons() {
+        ['bt-up', 'bt-down', 'bt-left', 'bt-right'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.classList.remove('active-btn');
+        });
+    }
+</script>
+</body>
+</html>
